@@ -134,9 +134,9 @@ async def analyze_token(data: dict) -> tuple:
     initial_buy = data.get("initialBuy", 0)
     market_cap_sol = data.get("marketCapSol", 0)
 
-    # Unrealistische Werte filtern
-    if initial_buy > MAX_INITIAL_BUY_SOL or market_cap_sol > 10000:
-        return False, f"Unrealistischer Wert"
+    # Unrealistische Werte filtern (nur initialer Kauf)
+    if initial_buy > MAX_INITIAL_BUY_SOL:
+        return False, f"Unrealistischer Wert: {initial_buy:.0f} SOL"
 
     sol_price = await get_sol_price_usd()
     market_cap_usd = market_cap_sol * sol_price
