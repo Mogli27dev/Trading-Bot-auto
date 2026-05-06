@@ -143,21 +143,21 @@ async def analyze_token(data: dict) -> tuple:
     if market_cap_usd > MAX_MARKETCAP_USD:
         return False, f"MarketCap zu hoch: ${market_cap_usd:.0f}"
 
-    if initial_buy < 1.0:
+    if initial_buy < 0.1:
         return False, f"Initialer Kauf zu niedrig: {initial_buy:.2f} SOL"
 
     score = 0
     reasons = []
 
-    if initial_buy >= 3.0:
+    if initial_buy >= 1.0:
         score += 3
-        reasons.append(f"✅ Starker Kauf: {initial_buy:.1f} SOL")
-    elif initial_buy >= 2.0:
+        reasons.append(f"✅ Starker Kauf: {initial_buy:.2f} SOL")
+    elif initial_buy >= 0.5:
         score += 2
-        reasons.append(f"✅ Guter Kauf: {initial_buy:.1f} SOL")
+        reasons.append(f"✅ Guter Kauf: {initial_buy:.2f} SOL")
     else:
         score += 1
-        reasons.append(f"⚠️ Kauf: {initial_buy:.1f} SOL")
+        reasons.append(f"⚠️ Kauf: {initial_buy:.2f} SOL")
 
     if market_cap_usd < 10000:
         score += 2
