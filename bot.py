@@ -79,7 +79,7 @@ async def get_token_price(token_mint: str) -> float:
 
 
 async def execute_trade(action: str, token_mint: str, amount) -> bool:
-    """Trade ausführen mit korrekter Signierung"""
+    """Trade ausführen über PumpPortal mit korrekter Signierung"""
     try:
         import base58
         from solders.keypair import Keypair
@@ -87,9 +87,11 @@ async def execute_trade(action: str, token_mint: str, amount) -> bool:
 
         key_bytes = base58.b58decode(PRIVATE_KEY)
         keypair = Keypair.from_bytes(key_bytes)
+        public_key = str(keypair.pubkey())
 
         async with aiohttp.ClientSession() as session:
             payload = {
+                "publicKey": public_key,
                 "action": action,
                 "mint": token_mint,
                 "amount": amount,
@@ -104,17 +106,23 @@ async def execute_trade(action: str, token_mint: str, amount) -> bool:
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
                 if resp.status != 200:
-                    log.error(f"PumpPortal {action} Fehler: {resp.status}")
+                    body = await resp.text()
+                    log.error(f"PumpPortal {action} Fehler: {resp.status} | {body}")
                     return False
                 tx_bytes = await resp.read()
 
+            # Transaktion signieren
             tx = VersionedTransaction.from_bytes(tx_bytes)
-            signed = keypair.sign_message(bytes(tx.message))
+            signed_tx = VersionedTransaction(tx.message, [keypair])
 
+            # Signierte Transaktion senden
             send_payload = {
                 "jsonrpc": "2.0", "id": 1,
                 "method": "sendTransaction",
-                "params": [base64.b64encode(tx_bytes).decode(), {"encoding": "base64", "skipPreflight": True}]
+                "params": [
+                    base64.b64encode(bytes(signed_tx)).decode(),
+                    {"encoding": "base64", "skipPreflight": True, "maxRetries": 3}
+                ]
             }
             async with session.post(RPC_URL, json=send_payload, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 result = await resp.json()
