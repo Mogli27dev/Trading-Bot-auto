@@ -131,12 +131,11 @@ async def execute_trade(action: str, token_mint: str, amount) -> bool:
 
 async def analyze_token(data: dict) -> tuple:
     name = data.get("name", "")
-    initial_buy = data.get("initialBuy", 0)
+    initial_buy_raw = data.get("initialBuy", 0)
     market_cap_sol = data.get("marketCapSol", 0)
 
-    # Unrealistische Werte filtern (nur initialer Kauf)
-    if initial_buy > MAX_INITIAL_BUY_SOL:
-        return False, f"Unrealistischer Wert: {initial_buy:.0f} SOL"
+    # initialBuy kommt in Lamports (1 SOL = 1.000.000.000 Lamports)
+    initial_buy = initial_buy_raw / 1_000_000_000
 
     sol_price = await get_sol_price_usd()
     market_cap_usd = market_cap_sol * sol_price
