@@ -190,14 +190,28 @@ async def monitor_positions():
 
                 if token_mint in manual_sell_requests:
                     success = await execute_trade("sell", token_mint, "100%")
+                    manual_sell_requests.discard(token_mint)
+                    del active_trades[token_mint]
                     if success:
-                        manual_sell_requests.discard(token_mint)
-                        del active_trades[token_mint]
                         await send_telegram(f"✅ <b>Manuell verkauft!</b>\nToken: {trade['name']}")
+                    else:
+                        await send_telegram(f"⚠️ <b>Manueller Verkauf fehlgeschlagen!</b>\nToken: {trade['name']}\nBitte manuell in Phantom verkaufen!")
                     continue
 
                 current_price = await get_token_price(token_mint)
+                
+                # Wenn entry_price 0 war, jetzt setzen
+                if trade["entry_price"] == 0 and current_price > 0:
+                    active_trades[token_mint]["entry_price"] = current_price
+                    log.info(f"Einstiegspreis gesetzt: {current_price} für {trade['name']}")
+                    continue
+
                 if current_price == 0 or trade["entry_price"] == 0:
+                    # Fallback: nach 30 Minuten ohne Preis verkaufen
+                    if time.time() - trade["entry_time"] > 1800:
+                        await execute_trade("sell", token_mint, "100%")
+                        del active_trades[token_mint]
+                        await send_telegram(f"⏱ <b>Timeout Verkauf</b>\nToken: {trade['name']}\nKein Preis verfügbar nach 30 Min")
                     continue
 
                 pnl_percent = ((current_price - trade["entry_price"]) / trade["entry_price"]) * 100
@@ -292,7 +306,7 @@ async def handle_telegram_commands():
     global bot_running
     offset = 0
 
-    await send_telegram("🚀 <b>Trading Bot gestartet!</b>\n\n/start - Bot starten\n/stop - Bot stoppen\n/status - Status\n/trades - Aktive Trades\n/pnl - Gewinn/Verlust\n/sellall - Alles verkaufen")
+    await send_telegram("🚀 <b>Trading Bot gestartet!</b>\n\n/start - Bot starten\n/stop - Bot stoppen\n/status - Status\n/trades - Aktive Trades\n/pnl - Gewinn/Verlust\n/sellall - Alles verkaufen\n/clearall - Trade-Liste leeren")
 
     while True:
         try:
@@ -348,6 +362,10 @@ async def handle_telegram_commands():
                                     for mint in list(active_trades.keys()):
                                         manual_sell_requests.add(mint)
                                     await send_telegram(f"🔴 Verkaufe alle {len(active_trades)} Positionen...")
+                            elif text == "/clearall":
+                                count = len(active_trades)
+                                active_trades.clear()
+                                await send_telegram(f"🗑 {count} Trades aus der Liste entfernt.\n⚠️ Tokens sind noch in deiner Wallet – bitte manuell in Phantom prüfen!")
 
         except Exception as e:
             log.error(f"Telegram Command Fehler: {e}")
